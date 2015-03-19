@@ -1,0 +1,49 @@
+{% extends "admin/change_form.html" %}
+{% load url from future %}
+{% load i18n %}
+
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans "Home" %}</a> &rsaquo;
+        <a href="{% url 'admin:app_list' app_label %}">{{app_label|capfirst|escape}}</a> &rsaquo; 
+        <a href="{{changelist_url}}">{{opts.verbose_name_plural|capfirst}}</a> &rsaquo;
+        <a href="{{change_url}}">{{original|truncatewords:"18"}}</a> &rsaquo;
+        <a href="../">{% trans "History" %}</a> &rsaquo;
+        {% trans "Read-only" %}
+    </div>
+{% endblock %}
+
+
+{% block content %}
+    <div id="content-main">
+        <p>{% blocktrans %}We were unable to load this previous revision due to model changes, instead here is the raw data that was stored at this snapshot.{% endblocktrans %}</p>
+        <table>
+            <tbody>
+                <tr>
+                    <th>{% trans "Date/time" %}:</th>
+                    <td>{{revision.date_created}}</td>
+                </tr>
+                <tr>
+                    <th>{% trans "User" %}:</th>
+                    <td>
+                        {% if revision.user %}
+                            {{revision.user.get_username}}
+                            {% if revision.user.get_full_name %} ({{revision.user.get_full_name}}){% endif %}
+                        {% else %}
+                            &mdash;
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>{% trans "Comment" %}:</th>
+                    <td>{{revision.comment|linebreaksbr|default:""}}</td>
+                </tr>
+                <tr>
+                    <th>{% trans "Data" %}:</th>
+                    <td><pre>{{serialized_data}}</pre></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

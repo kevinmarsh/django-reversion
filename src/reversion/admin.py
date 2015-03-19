@@ -6,13 +6,16 @@ from functools import partial
 
 from django import template
 from django.db import models, transaction, connection
+from django.conf import settings
 from django.conf.urls import patterns, url
 from django.contrib import admin
 from django.contrib.admin import helpers, options
 from django.contrib.admin.util import unquote, quote
 from django.contrib.contenttypes.generic import GenericInlineModelAdmin, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.serializers.base import DeserializationError
 from django.core.urlresolvers import reverse
+from django.db import IntegrityError
 from django.forms.formsets import all_valid
 from django.forms.models import model_to_dict
 from django.http import HttpResponseRedirect
@@ -26,6 +29,8 @@ from django.utils.formats import localize
 
 from reversion.models import Revision, Version, has_int_pk
 from reversion.revisions import default_revision_manager, RegistrationError
+
+import json
 
 
 class VersionAdmin(admin.ModelAdmin):
@@ -405,7 +410,21 @@ class VersionAdmin(admin.ModelAdmin):
         # Generate the context.
         context = {"title": _("Revert %(name)s") % {"name": force_text(self.model._meta.verbose_name)},}
         context.update(extra_context or {})
-        return self.render_revision_form(request, obj, version, context, revert=True)
+        try:
+            return self.render_revision_form(request, obj, version, context, revert=True)
+        except (DeserializationError, IntegrityError) as e:
+            if getattr(settings, "REVERSION_CATCH_ERRORS", False):
+                opts = self.model._meta
+                context.update({"serialized_data": json.dumps(map(json.loads, version.revision.version_set.values_list("serialized_data", flat=True)), indent=4),
+                                "revision": version.revision,
+                                "original": obj,
+                                "app_label": opts.app_label,
+                                "opts": opts,
+                                "changelist_url": reverse("%s:%s_%s_changelist" % (self.admin_site.name, opts.app_label, opts.model_name)),
+                                "change_url": reverse("%s:%s_%s_change" % (self.admin_site.name, opts.app_label, opts.model_name), args=(quote(obj.pk),))})
+                return render_to_response("reversion/revision_readonly.html", context, template.RequestContext(request))
+            else:
+                raise e
     
     def changelist_view(self, request, extra_context=None):
         """Renders the change view."""
