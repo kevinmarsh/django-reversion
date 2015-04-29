@@ -410,21 +410,7 @@ class VersionAdmin(admin.ModelAdmin):
         # Generate the context.
         context = {"title": _("Revert %(name)s") % {"name": force_text(self.model._meta.verbose_name)},}
         context.update(extra_context or {})
-        try:
-            return self.render_revision_form(request, obj, version, context, revert=True)
-        except (DeserializationError, IntegrityError) as e:
-            if getattr(settings, "REVERSION_CATCH_ERRORS", False):
-                opts = self.model._meta
-                context.update({"serialized_data": json.dumps(map(json.loads, version.revision.version_set.values_list("serialized_data", flat=True)), indent=4),
-                                "revision": version.revision,
-                                "original": obj,
-                                "app_label": opts.app_label,
-                                "opts": opts,
-                                "changelist_url": reverse("%s:%s_%s_changelist" % (self.admin_site.name, opts.app_label, opts.model_name)),
-                                "change_url": reverse("%s:%s_%s_change" % (self.admin_site.name, opts.app_label, opts.model_name), args=(quote(obj.pk),))})
-                return render_to_response("reversion/revision_readonly.html", context, template.RequestContext(request))
-            else:
-                raise e
+        return self.render_revision_form(request, obj, version, context, revert=True)
     
     def changelist_view(self, request, extra_context=None):
         """Renders the change view."""
@@ -495,3 +481,25 @@ class VersionMetaAdmin(VersionAdmin):
         """Displays the last modified date of the given object, typically for use in a change list."""
         return localize(obj.date_modified)
     get_date_modified.short_description = "date modified"
+
+
+class ReadOnlyVersionAdmin(VersionAdmin):
+    
+    """
+    An enhanced VersionAdmin that allows you to view a JSON version of an  object
+    which would otherwise throw an Error due to model changes from a migration.
+    """
+    
+    def render_revision_form(self, request, obj, version, context, revert=False, recover=False):
+        try:
+            return super(ReadOnlyVersionAdmin, self).render_revision_form(request, obj, version, context, revert, recover)
+        except (DeserializationError, IntegrityError) as e:
+            opts = self.model._meta
+            context.update({"serialized_data": json.dumps(map(json.loads, version.revision.version_set.values_list("serialized_data", flat=True)), indent=2),
+                            "revision": version.revision,
+                            "original": obj,
+                            "app_label": opts.app_label,
+                            "opts": opts,
+                            "changelist_url": reverse("%s:%s_%s_changelist" % (self.admin_site.name, opts.app_label, opts.model_name)),
+                            "change_url": reverse("%s:%s_%s_change" % (self.admin_site.name, opts.app_label, opts.model_name), args=(quote(obj.pk),))})
+            return render_to_response("reversion/revision_readonly.html", context, template.RequestContext(request))

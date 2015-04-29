@@ -9,7 +9,7 @@ Developed by Dave Hall.
 from __future__ import unicode_literals
 
 from reversion.revisions import default_revision_manager, revision_context_manager, VersionAdapter
-from reversion.admin import VersionAdmin
+from reversion.admin import ReadOnlyVersionAdmin , VersionAdmin
 from reversion.models import pre_revision_commit, post_revision_commit
 from reversion.version import __version__ 
 
